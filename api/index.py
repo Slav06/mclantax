@@ -300,61 +300,40 @@ DASHBOARD_HTML = """
 </html>
 """
 
-# Simple JSON file storage for Vercel
-DATA_FILE = '/tmp/videos.json'
+# In-memory storage for Vercel (resets on each function call, but works for demo)
+SAMPLE_DATA = {
+    'videos': [
+        {
+            'id': 'sample-1',
+            'trend': 'Tax Season Memes Go Viral on TikTok',
+            'script': 'Hey grownups! *giggles* So I heard you\'re all stressed about taxes again? I\'m literally three months old and even I know you should call McLan Tax! 👶💰',
+            'videoUrl': 'https://example.com/videos/sample1.mp4',
+            'captions': {
+                'tiktok': 'When this baby knows more about taxes than you do 😂👶 #BabyTax #TaxSeason #McLanTax #FYP',
+                'instagram': 'POV: A baby gives better tax advice than your accountant 💀 @mclantax #reels #viral #tax',
+                'youtube': 'Baby Gives SAVAGE Tax Advice (You Won\'t Believe What Happens Next!) #shorts #tax #baby'
+            },
+            'status': 'pending',
+            'created_at': '2025-01-13T12:00:00'
+        },
+        {
+            'id': 'sample-2',
+            'trend': 'Inflation Concerns Dominate Social Media',
+            'script': 'Listen up adults! *baby babbles* I may only eat milk and baby food, but even I know inflation is crazy! My diapers cost more than your tax deductions! Call McLan Tax! 👶💸',
+            'videoUrl': 'https://example.com/videos/sample2.mp4',
+            'captions': {
+                'tiktok': 'This baby understands inflation better than economists 📈👶 #InflationBaby #TaxTips #McLanTax',
+                'instagram': 'When even babies are worried about the economy 😅 Let @mclantax help! #inflation #baby #tax',
+                'youtube': 'Baby Explains Inflation Crisis (Adults Are Shocked!) #shorts #inflation #baby #finance'
+            },
+            'status': 'pending',
+            'created_at': '2025-01-13T11:30:00'
+        }
+    ]
+}
 
-def load_data():
-    """Load data from JSON file."""
-    try:
-        if os.path.exists(DATA_FILE):
-            with open(DATA_FILE, 'r') as f:
-                return json.load(f)
-        else:
-            # Initialize with sample data
-            sample_data = {
-                'videos': [
-                    {
-                        'id': str(uuid.uuid4()),
-                        'trend': 'Tax Season Memes Go Viral on TikTok',
-                        'script': 'Hey grownups! *giggles* So I heard you\'re all stressed about taxes again? I\'m literally three months old and even I know you should call McLan Tax! 👶💰',
-                        'video_url': 'https://example.com/videos/sample1.mp4',
-                        'captions': {
-                            'tiktok': 'When this baby knows more about taxes than you do 😂👶 #BabyTax #TaxSeason #McLanTax #FYP',
-                            'instagram': 'POV: A baby gives better tax advice than your accountant 💀 @mclantax #reels #viral #tax',
-                            'youtube': 'Baby Gives SAVAGE Tax Advice (You Won\'t Believe What Happens Next!) #shorts #tax #baby'
-                        },
-                        'status': 'pending',
-                        'created_at': datetime.now().isoformat()
-                    },
-                    {
-                        'id': str(uuid.uuid4()),
-                        'trend': 'Inflation Concerns Dominate Social Media',
-                        'script': 'Listen up adults! *baby babbles* I may only eat milk and baby food, but even I know inflation is crazy! My diapers cost more than your tax deductions! Call McLan Tax! 👶💸',
-                        'video_url': 'https://example.com/videos/sample2.mp4',
-                        'captions': {
-                            'tiktok': 'This baby understands inflation better than economists 📈👶 #InflationBaby #TaxTips #McLanTax',
-                            'instagram': 'When even babies are worried about the economy 😅 Let @mclantax help! #inflation #baby #tax',
-                            'youtube': 'Baby Explains Inflation Crisis (Adults Are Shocked!) #shorts #inflation #baby #finance'
-                        },
-                        'status': 'pending',
-                        'created_at': datetime.now().isoformat()
-                    }
-                ]
-            }
-            save_data(sample_data)
-            return sample_data
-    except Exception as e:
-        print(f"Error loading data: {e}")
-        return {'videos': []}
-
-def save_data(data):
-    """Save data to JSON file."""
-    try:
-        os.makedirs(os.path.dirname(DATA_FILE), exist_ok=True)
-        with open(DATA_FILE, 'w') as f:
-            json.dump(data, f, indent=2)
-    except Exception as e:
-        print(f"Error saving data: {e}")
+# Simple data store (resets with each serverless function call)
+current_data = SAMPLE_DATA.copy()
 
 # API Routes
 @app.route('/')
@@ -366,11 +345,10 @@ def dashboard():
 def get_videos():
     """Get all videos."""
     try:
-        data = load_data()
         status = request.args.get('status', 'pending')
         
         # Filter videos by status
-        filtered_videos = [v for v in data['videos'] if v['status'] == status]
+        filtered_videos = [v for v in current_data['videos'] if v['status'] == status]
         
         return jsonify(filtered_videos)
     except Exception as e:
@@ -380,17 +358,13 @@ def get_videos():
 def approve_video(video_id):
     """Approve a video."""
     try:
-        data = load_data()
-        
         # Find and update video
-        for video in data['videos']:
+        for video in current_data['videos']:
             if video['id'] == video_id:
                 video['status'] = 'approved'
                 video['approved_at'] = datetime.now().isoformat()
                 video['posted_platforms'] = ['tiktok', 'instagram', 'youtube_shorts']
                 break
-        
-        save_data(data)
         
         return jsonify({
             'success': True,
@@ -404,15 +378,11 @@ def approve_video(video_id):
 def reject_video(video_id):
     """Reject a video."""
     try:
-        data = load_data()
-        
         # Find and update video
-        for video in data['videos']:
+        for video in current_data['videos']:
             if video['id'] == video_id:
                 video['status'] = 'rejected'
                 break
-        
-        save_data(data)
         
         return jsonify({'success': True, 'message': 'Video rejected'})
     except Exception as e:
@@ -422,17 +392,8 @@ def reject_video(video_id):
 def generate_video():
     """Generate a new video."""
     try:
-        data = load_data()
-        
         # Mock scenarios for random generation
         mock_scenarios = [
-            {
-                'trend': 'Tax Season Memes Go Viral on TikTok',
-                'script': 'Hey grownups! *giggles* So I heard you\'re all stressed about taxes again? I\'m literally three months old and even I know you should call McLan Tax! They make taxes as easy as taking candy from a baby! 👶💰',
-                'tiktok': 'When this baby knows more about taxes than you do 😂👶 #BabyTax #TaxSeason #McLanTax #FYP',
-                'instagram': 'POV: A baby gives better tax advice than your accountant 💀 This little one knows what\'s up! 👶✨ @mclantax #reels #viral #tax',
-                'youtube': 'Baby Gives SAVAGE Tax Advice (You Won\'t Believe What Happens Next!) #shorts #tax #baby #viral'
-            },
             {
                 'trend': 'Cryptocurrency Tax Confusion Trending',
                 'script': 'Wait, wait, wait! *baby confusion sounds* You adults are confused about crypto taxes? I don\'t even know what Bitcoin is but I know McLan Tax can help! They handle all that digital money stuff! 👶💻',
@@ -446,6 +407,13 @@ def generate_video():
                 'tiktok': 'Baby CEO claims nursery as home office tax deduction 😂👶 #WFH #TaxDeductions #BabyCEO #McLanTax',
                 'instagram': 'When babies understand WFH tax deductions better than adults 💼👶 @mclantax #workfromhome #tax',
                 'youtube': 'Baby Claims Nursery as Business Expense (IRS Approved?) #shorts #wfh #tax #baby'
+            },
+            {
+                'trend': 'Gen Z Financial Stress Dominates Social Media',
+                'script': 'Listen Gen Z! *baby wisdom voice* You think student loans are stressful? Try teething! But seriously, McLan Tax can help with your financial stress. I believe in you! 👶💪',
+                'tiktok': 'Baby motivational speaker helps stressed Gen Z with finances 🍼💰 #BabyWisdom #GenZ #McLanTax',
+                'instagram': 'When a baby gives better financial pep talks than your therapist 👶✨ @mclantax #genz #finance #baby',
+                'youtube': 'Baby Motivates Financially Stressed Gen Z (Emotional!) #shorts #genz #finance #baby'
             }
         ]
         
@@ -453,10 +421,10 @@ def generate_video():
         scenario = random.choice(mock_scenarios)
         
         new_video = {
-            'id': str(uuid.uuid4()),
+            'id': f'generated-{int(time.time())}',
             'trend': scenario['trend'],
             'script': scenario['script'],
-            'video_url': f'https://example.com/videos/baby_tax_video_{int(time.time())}.mp4',
+            'videoUrl': f'https://example.com/videos/baby_tax_video_{int(time.time())}.mp4',
             'captions': {
                 'tiktok': scenario['tiktok'],
                 'instagram': scenario['instagram'],
@@ -466,8 +434,7 @@ def generate_video():
             'created_at': datetime.now().isoformat()
         }
         
-        data['videos'].append(new_video)
-        save_data(data)
+        current_data['videos'].append(new_video)
         
         return jsonify({'success': True, 'message': 'New baby video generated successfully!'})
     except Exception as e:
@@ -477,30 +444,23 @@ def generate_video():
 def get_stats():
     """Get dashboard statistics."""
     try:
-        data = load_data()
-        
-        pending = len([v for v in data['videos'] if v['status'] == 'pending'])
-        approved = len([v for v in data['videos'] if v['status'] == 'approved'])
-        rejected = len([v for v in data['videos'] if v['status'] == 'rejected'])
+        pending = len([v for v in current_data['videos'] if v['status'] == 'pending'])
+        approved = len([v for v in current_data['videos'] if v['status'] == 'approved'])
+        rejected = len([v for v in current_data['videos'] if v['status'] == 'rejected'])
         
         # Recent videos (last 7 days)
         week_ago = (datetime.now() - timedelta(days=7)).isoformat()
-        recent = len([v for v in data['videos'] if v['created_at'] > week_ago])
+        recent = len([v for v in current_data['videos'] if v.get('created_at', '2025-01-13T12:00:00') > week_ago])
         
         return jsonify({
             'pending': pending,
             'approved': approved,
             'rejected': rejected,
             'recent_videos': recent,
-            'total_videos': len(data['videos'])
+            'total_videos': len(current_data['videos'])
         })
     except Exception as e:
         return jsonify({'error': str(e)}), 500
 
-# Vercel handler
-def handler(request):
-    """Vercel serverless handler."""
-    return app(request.environ, lambda status, headers: None)
-
-if __name__ == '__main__':
-    app.run(debug=True) 
+# Vercel entry point
+app = app 
