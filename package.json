@@ -1,0 +1,12 @@
+{
+  "name": "mclantax-baby-videos",
+  "version": "1.0.0",
+  "description": "McLan Tax Baby Video Creator Dashboard",
+  "main": "api/index.py",
+  "scripts": {
+    "dev": "python api/index.py"
+  },
+  "keywords": ["flask", "baby", "tax", "videos", "dashboard"],
+  "author": "McLan Tax",
+  "license": "MIT"
+} 
